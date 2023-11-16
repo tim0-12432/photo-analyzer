@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, FormEvent, useRef } from 'react'
 import { TreeView } from '@mui/x-tree-view/TreeView';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
@@ -13,9 +13,10 @@ import Image from './types/Image';
 import Section from './components/Section';
 import ChartCard from './components/ChartCard';
 import capitalize, { getFraction } from './utils/formatting';
+import ImageMap from './types/ImageMap';
 
 
-const apiHost = import.meta.env.DEV ? 'http://localhost:5050' : '';
+const apiHost = import.meta.env.DEV ? 'http://localhost:5050' : window.location.origin;
 
 function App() {
   const [currentDir, setCurrentDir] = useState<string>('C:\\Users');
@@ -23,6 +24,9 @@ function App() {
   const [currentAnalysis, setCurrentAnalysis] = useState<Image[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
   const [showUnknown, setShowUnknown] = useState<boolean>(true);
+  const [imagesForFile, setImagesForFile] = useState<ImageMap>({});
+  const analysisFetchController = useRef<AbortController | undefined>(undefined);
+  const imageFetchController = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,17 +39,53 @@ function App() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (analysisFetchController.current) {
+        analysisFetchController.current.abort();
+      }
+      analysisFetchController.current = new AbortController();
       const resultFiles = await fetch(apiHost + '/api/directory/files');
       const dataFiles = await resultFiles.json();
       setCurrentDirContent(() => dataFiles);
       setLoadingAnalysis(() => true);
-      const resultImages = await fetch(apiHost + '/api/directory/images');
+      const resultImages = await fetch(
+        apiHost + '/api/directory/images',
+        {
+          signal: analysisFetchController.current.signal
+        }
+      );
       const dataImages = await resultImages.json();
       setCurrentAnalysis(() => dataImages);
       setLoadingAnalysis(() => false);
     };
     fetchData();
   }, [currentDir]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (imageFetchController.current) {
+        imageFetchController.current.abort();
+      }
+      imageFetchController.current = new AbortController();
+      for (const file of currentDirContent) {
+        if (file.isFile) {
+          const result = await fetch(
+            apiHost + '/api/image/' + file.name,
+            {
+              signal: imageFetchController.current.signal
+            }
+          );
+          const data = await result.text();
+          setImagesForFile((prev) => {
+            return {
+              ...prev,
+              [file.name]: data
+            };
+          });
+        }
+      }
+    };
+    fetchData();
+  }, [currentDirContent]);
 
   const handleNodeSelect = (name: string) => {
     const fetchData = async () => {
@@ -73,7 +113,6 @@ function App() {
     .map((image: Image) => image.exif.lens === null ? 'Unknown' : image.exif.lens)
     .filter((lens: string) => lens !== 'None None' || showUnknown)
   )];
-  console.log(currentDir, currentDirContent, currentAnalysis, camModels, lensModels);
   return (
     <Box sx={{
       display: 'flex',
@@ -174,6 +213,21 @@ function App() {
                             <Typography variant="body2" component="p">
                               {file.name}
                             </Typography>
+                          )
+                        }
+                        {
+                          file.name in imagesForFile && (
+                            <Box
+                              sx={{
+                                background: `url(data:image/jpeg;base64,${imagesForFile[file.name]})`,
+                                backgroundSize: 'contain',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundPosition: 'center',
+                                maxHeight: (theme) => theme.spacing(25),
+                                aspectRatio: '1/1',
+                                marginTop: (theme) => theme.spacing(2),
+                              }}
+                            />
                           )
                         }
                       </CardContent>

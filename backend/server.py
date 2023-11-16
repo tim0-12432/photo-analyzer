@@ -82,6 +82,11 @@ def main():
         return jsonify(service.get_images())
 
 
+    @app.route("/api/image/<name>", methods=["GET"])
+    def get_image(name):
+        return service.get_image(name)
+
+
     if cfg["app.debug"] == True:
         app.run(host=cfg["app.host"], port=cfg["app.port"], debug=cfg["app.debug"], use_reloader=True)
     else:

@@ -1,6 +1,6 @@
 from exif_service import ExifService
 from ai_service import AiService
-from PIL import Image
+import base64
 import os
 
 
@@ -46,6 +46,10 @@ class ImageService:
             self.directory = os.path.dirname(self.directory)
         else:
             self.directory = os.path.join(self.directory, directory)
+
+    def get_image(self, file):
+        with open(os.path.join(self.directory, file), "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
 
     def get_files_and_directories(self):
         files = [{"name": "..", "isFile": False}]
