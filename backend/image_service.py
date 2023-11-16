@@ -1,5 +1,6 @@
+from exif_service import ExifService
+from ai_service import AiService
 from PIL import Image
-import exiftool
 import os
 
 
@@ -9,6 +10,9 @@ class ImageService:
         self.directory = initial_path
         self.app = app
         self.ai_enabled = ai_enabled
+        self.exif_service = ExifService()
+        if self.ai_enabled:
+            self.ai_service = AiService()
 
     def get_current_directory(self):
         return self.directory
@@ -25,28 +29,12 @@ class ImageService:
                 except IOError:
                     self.app.logger.warning("File %s is not an image", file)
                     continue
-                exif_tool_path = os.path.join(os.path.dirname(__file__), "exiftool.exe")
-                with exiftool.ExifToolHelper(executable=exif_tool_path) as et:
-                    meta_data = et.get_metadata(os.path.join(directory, file))
-                    if len(meta_data) == 0:
-                        self.app.logger.warning("No metadata found for image %s", file)
-                        continue
-                    meta = meta_data[0]
-                    images.append({
-                        "name": meta.get("File:FileName"),
-                        "exif": {
-                            "model": meta.get("EXIF:Model"),
-                            "manufacturer": meta.get("EXIF:Make"),
-                            "software": meta.get("EXIF:Software"),
-                            "aperture": meta.get("EXIF:FNumber"),
-                            "exposure": meta.get("EXIF:ExposureTime"),
-                            "iso": meta.get("EXIF:ISO"),
-                            "datetime": meta.get("EXIF:DateTimeOriginal"),
-                            "focal_length": meta.get("EXIF:FocalLength"),
-                            "focal_length_35": meta.get("EXIF:FocalLengthIn35mmFormat"),
-                            "lens": str(meta.get("EXIF:LensMake")) + " " + str(meta.get("EXIF:LensModel"))
-                        }
-                    })
+                try:
+                    images.append(self.exif_service.get_metadata(directory, file))
+                except LookupError:
+                    continue
+                if self.ai_enabled:
+                    images[-1]["motif"] = self.ai_service.get_image_motif(directory, file)
             elif remaining_depth > 0:
                 images.extend(self.__get_images(os.path.join(directory, file), remaining_depth - 1))
         return images

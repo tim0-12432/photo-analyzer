@@ -1,6 +1,7 @@
 
 export type Image = {
     name: string;
+    motif?: string;
     exif: {
         aperture: number;
         exposure: number;

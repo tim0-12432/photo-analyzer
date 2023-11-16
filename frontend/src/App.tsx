@@ -69,7 +69,11 @@ function App() {
     .map((image: Image) => image.exif.model === null ? 'Unknown' : image.exif.model)
     .filter((model: string) => model !== 'Unknown' || showUnknown)
   )];
-  console.log(currentDir, currentDirContent, currentAnalysis, camModels);
+  const lensModels = [...new Set(currentAnalysis
+    .map((image: Image) => image.exif.lens === null ? 'Unknown' : image.exif.lens)
+    .filter((lens: string) => lens !== 'None None' || showUnknown)
+  )];
+  console.log(currentDir, currentDirContent, currentAnalysis, camModels, lensModels);
   return (
     <Box sx={{
       display: 'flex',
@@ -152,11 +156,18 @@ function App() {
                                 {file.name}
                               </Typography>
                               {
-                                Object.entries(currentAnalysis.filter((image: Image) => image.name === file.name).map((image: Image) => image.exif)[0]).map(([key, value]) => (
+                                Object.entries(currentAnalysis.filter((image: Image) => image.name === file.name)[0].exif).map(([key, value]) => (
                                   <Typography key={key} variant="body2" component="p">
-                                    <b>{capitalize(key)}</b>: {value}
+                                    <b>{capitalize(key)}</b>: {value ?? 'Unknown'}
                                   </Typography>
                                 ))
+                              }
+                              {
+                                currentAnalysis.filter((image: Image) => image.name === file.name)[0].motif && (
+                                  <Typography variant="body2" component="p">
+                                    <b>Motif</b>: {capitalize(currentAnalysis.filter((image: Image) => image.name === file.name)[0].motif ?? 'Not found')}
+                                  </Typography>
+                                )
                               }
                             </>
                           ) : (
@@ -202,8 +213,38 @@ function App() {
         flexGrow: 1
       }}>
         {
-          currentAnalysis.length <= 0 || loadingAnalysis ? (
-            <CircularProgress />
+          currentAnalysis.length <= 0 && !loadingAnalysis && (
+            <Typography
+              variant="body1"
+              component="p"
+              color="error"
+            >
+              No analysis found for this directory.
+            </Typography>
+          )
+        }
+        {
+          loadingAnalysis ? (
+            <>
+              <CircularProgress />
+              <Typography
+                variant="body1"
+                component="p"
+                color="text.secondary"
+                sx={{
+                  marginTop: (theme) => theme.spacing(1.5)
+                }}
+              >
+                Analyzing images...
+              </Typography>
+              <Typography
+                variant="caption"
+                component="p"
+                color="text.secondary"
+              >
+                This can take a few minutes depending on the number of images.
+              </Typography>
+            </>
           ) : (
             <>
               <Box
@@ -248,7 +289,7 @@ function App() {
                           if (camera === 'Unknown' && !showUnknown) {
                             return prev;
                           }
-                          if (!prev.hasOwnProperty(camera)) {
+                          if (!(camera in prev)) {
                             prev[camera] = 1;
                           } else {
                             prev[camera] += 1;
@@ -274,7 +315,7 @@ function App() {
                         if ((lens === 'Unknown' || model === 'Unknown') && !showUnknown) {
                           return prev;
                         }
-                        if (!prev.hasOwnProperty(lens) || !prev[lens].hasOwnProperty(model)) {
+                        if (!(lens in prev) || !(model in prev[lens])) {
                           prev[lens] = prev[lens] || {};
                           prev[lens][model] = 1;
                         } else {
@@ -282,7 +323,7 @@ function App() {
                         }
                         return prev;
                       }, {})).map(([lens, value]): {data: number[], label: string} => ({
-                        data: camModels.map((cam) => value.hasOwnProperty(cam) ? value[cam] : 0),
+                        data: camModels.map((cam) => cam in value ? value[cam] : 0),
                         label: lens
                       }))
                     }
@@ -314,7 +355,10 @@ function App() {
                             prev[focalLength] += 1;
                           }
                           return prev;
-                        }, {})).map(([key, value], idx) => ({
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        }, {})).sort(([fA, _], [fB, __]) => {
+                          return fA.localeCompare(fB);
+                        }).map(([key, value], idx) => ({
                           id: idx,
                           label: key,
                           value: value
@@ -397,15 +441,15 @@ function App() {
                       Object.entries(currentAnalysis.reduce((prev: {[focalLength: string]: {[cam: string]: number}}, curr: Image) => {
                         const aperture = curr.exif.aperture === null || curr.exif.aperture === undefined
                         ? 'Unknown' : curr.exif.aperture.toString();
-                        const model = curr.exif.model ?? 'Unknown';
-                        if ((aperture === 'Unknown' || model === 'Unknown') && !showUnknown) {
+                        const lens = curr.exif.lens ?? 'Unknown';
+                        if ((aperture === 'Unknown' || lens === 'None None') && !showUnknown) {
                           return prev;
                         }
-                        if (!(aperture in prev) || !(model in prev[aperture])) {
+                        if (!(aperture in prev) || !(lens in prev[aperture])) {
                           prev[aperture] = prev[aperture] || {};
-                          prev[aperture][model] = 1;
+                          prev[aperture][lens] = 1;
                         } else {
-                          prev[aperture][model] += 1;
+                          prev[aperture][lens] += 1;
                         }
                         return prev;
                       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -414,7 +458,7 @@ function App() {
                         const fBL: number = aB === 'Unknown' ? 0 : parseFloat(aB);
                         return fAL - fBL;
                       }).map(([aperture, value]): {data: number[], label: string} => ({
-                        data: camModels.map((cam) => cam in value ? value[cam] : 0),
+                        data: lensModels.map((lens) => lens in value ? value[lens] : 0),
                         label: aperture
                       }))
                     }
@@ -423,7 +467,7 @@ function App() {
                     xAxis={[
                       {
                         scaleType: 'band',
-                        data: camModels
+                        data: lensModels
                       },
                     ]}
                   />
@@ -542,9 +586,7 @@ function App() {
                         return prev;
                       // eslint-disable-next-line @typescript-eslint/no-unused-vars
                       }, {})).sort(([eA, _], [eB, __]) => {
-                        const fAL: number = eA === 'Unknown' ? 0 : parseFloat(eA);
-                        const fBL: number = eB === 'Unknown' ? 0 : parseFloat(eB);
-                        return fAL - fBL;
+                        return eA.localeCompare(eB);
                       }).map(([exposure, value]): {data: number[], label: string} => ({
                         data: camModels.map((cam) => cam in value ? value[cam] : 0),
                         label: exposure
@@ -561,6 +603,73 @@ function App() {
                   />
                 </ChartCard>
               </Section>
+              {
+                currentAnalysis.filter((image) => image.motif !== null && image.motif !== undefined).length > 0 && (
+
+                  <Section title="Motifs">
+                    <ChartCard>
+                      <PieChart
+                        series={[
+                          {
+                            data: Object.entries(currentAnalysis.reduce((prev: {[key: string]: number}, curr: Image) => {
+                              const motif = curr.motif ? capitalize(curr.motif) : "Not found";
+                              if (motif === 'Not found' && !showUnknown) {
+                                return prev;
+                              }
+                              if (!(motif in prev)) {
+                                prev[motif] = 1;
+                              } else {
+                                prev[motif] += 1;
+                              }
+                              return prev;
+                            }, {})).map(([key, value], idx) => ({
+                              id: idx,
+                              label: key,
+                              value: value
+                            }))
+                          },
+                        ]}
+                        width={400}
+                        height={200}
+                      />
+                    </ChartCard>
+                    <ChartCard>
+                      <BarChart
+                        series={
+                          Object.entries(currentAnalysis.reduce((prev: {[focalLength: string]: {[cam: string]: number}}, curr: Image) => {
+                            const motif = curr.motif ? capitalize(curr.motif) : "Not found";
+                            const lens = curr.exif.lens ?? 'Unknown';
+                            if ((motif === 'Unknown' || lens === 'None None') && !showUnknown) {
+                              return prev;
+                            }
+                            if (!(motif in prev) || !(lens in prev[motif])) {
+                              prev[motif] = prev[motif] || {};
+                              prev[motif][lens] = 1;
+                            } else {
+                              prev[motif][lens] += 1;
+                            }
+                            return prev;
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                          }, {})).sort(([mA, _], [mB, __]) => {
+                            return mA.localeCompare(mB);
+                          }).map(([motif, value]): {data: number[], label: string} => ({
+                            data: lensModels.map((lens) => lens in value ? value[lens] : 0),
+                            label: motif
+                          }))
+                        }
+                        width={400}
+                        height={350}
+                        xAxis={[
+                          {
+                            scaleType: 'band',
+                            data: lensModels
+                          },
+                        ]}
+                      />
+                    </ChartCard>
+                  </Section>
+                )
+              }
             </>
           )
         }
