@@ -1,0 +1,10 @@
+.venv
+venv
+env
+*.env
+
+__pycache__/
+
+dist/
+static/
+templates/
