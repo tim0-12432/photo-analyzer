@@ -1,4 +1,6 @@
 import exiftool
+import requests
+import shutil
 import os
 
 
@@ -6,6 +8,13 @@ class ExifService:
 
     def __init__(self, exif_tool_path=os.path.join(os.path.dirname(__file__), "exiftool.exe")):
         self.exif_tool_path = exif_tool_path
+        if not os.path.exists(self.exif_tool_path):
+            r = requests.get("https://exiftool.org/exiftool-12.72.zip", allow_redirects=True)
+            zip_path = exif_tool_path + ".zip"
+            open(zip_path, 'wb').write(r.content)
+            shutil.unpack_archive(zip_path, os.path.join(os.path.dirname(__file__)))
+            os.remove(zip_path)
+            os.rename(os.path.join(os.path.dirname(__file__), "exiftool(-k).exe"), self.exif_tool_path)
 
     def get_metadata(self, directory, file):
         with exiftool.ExifToolHelper(executable=self.exif_tool_path) as et:
