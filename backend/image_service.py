@@ -1,5 +1,6 @@
 from exif_service import ExifService
 from ai_service import AiService
+from PIL import Image
 import base64
 import os
 

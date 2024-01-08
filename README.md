@@ -13,17 +13,28 @@ This is a small server application for your personal computer that allows you to
 - Browse through your files and directories
 - Shows analytics to all photos (mainly JPEGs) in the current directory and in subdirectories
   - Shows common EXIF data e.g. camera model, exposure time, ISO, aperture, focal length, etc.
-  - Shows the motif of the photo (e.g. elephant, car, plant) detected by a neural network
+  - Shows the type of the photo (e.g. portrait, landscape, flower) detected by a neural network
 
 ## Installation
 
-- Ensure Python3 is installed
+- Ensure Python3 is instal
+- Ensure NodeJS with NPM is installed
 - Just download the source code of the project.
 
 ## Usage
 
 - cd into your preferred directory: `cd <path to photos>`
 - run the `run.py` script: `python <path to project>\photo-analyzer\run.py`
+
+## Configuration
+
+This tool reads some environment variables to configure the application.
+
+- `PHOTO_ANALYZER-APP-HOST`: The host the server should listen on (default: 0.0.0.0)
+- `PHOTO_ANALYZER-APP-PORT`: The port the server should listen on (default: 8080)
+- `PHOTO_ANALYZER-APP-DEBUG`: If the server should run in debug mode (default: False)
+- `PHOTO_ANALYZER-LOG_LEVEL`: The log level of the server (default: WARNING)
+- `PHOTO_ANALYZER-AI_ENABLED`: The log level of the server (default: True)
 
 ## Disclaimer
 
